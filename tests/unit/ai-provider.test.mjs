@@ -130,3 +130,51 @@ test("OpenAI-compatible provider streams content deltas and final usage", async 
     { type: "done" },
   ]);
 });
+
+test("OpenAI-compatible provider sends embedding requests and maps vectors", async () => {
+  const { createOpenAiCompatibleProvider } = await loadAiModule("providers/openai-compatible.ts");
+  const calls = [];
+
+  const provider = createOpenAiCompatibleProvider({
+    config: {
+      provider: "openai-compatible",
+      baseUrl: "https://example.test/v1",
+      apiKey: "secret-key",
+      chatModel: "chat-model",
+      fastModel: "",
+      reasoningModel: "",
+      embeddingModel: "embedding-model",
+    },
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+
+      return new Response(JSON.stringify({
+        model: "embedding-model",
+        data: [
+          { index: 0, embedding: [0.1, 0.2] },
+          { index: 1, embedding: [0.3, 0.4] },
+        ],
+        usage: {
+          prompt_tokens: 5,
+          total_tokens: 5,
+        },
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  const result = await provider.embed({
+    input: ["first", "second"],
+  });
+
+  assert.deepEqual(result.embeddings, [[0.1, 0.2], [0.3, 0.4]]);
+  assert.deepEqual(result.usage, {
+    inputTokens: 5,
+    outputTokens: 0,
+    totalTokens: 5,
+  });
+  assert.equal(calls[0].url, "https://example.test/v1/embeddings");
+  assert.equal(JSON.parse(calls[0].init.body).model, "embedding-model");
+});

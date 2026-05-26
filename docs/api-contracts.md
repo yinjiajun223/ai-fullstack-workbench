@@ -1,6 +1,6 @@
-# API Contracts
+# API 契约
 
-API routes should use typed success and failure shapes.
+所有 API Route 都应该使用统一成功/失败结构。
 
 ```ts
 export type ApiSuccess<T> = {
@@ -20,18 +20,18 @@ export type ApiFailure = {
 };
 ```
 
-## Rules
+## 通用规则
 
-- Validate request bodies with Zod.
-- Do not leak stack traces, SQL errors, or provider secrets.
-- Log unexpected errors with request id.
-- Never expose `AI_API_KEY` or other non-public provider settings to client components.
+- 请求体必须用 Zod 校验。
+- 不返回 stack trace、SQL 错误、provider secret。
+- 意外错误必须带 requestId 记录日志。
+- 前端组件不能读取或暴露 `AI_API_KEY`。
 
 ## Chat API
 
 `POST /api/chat`
 
-Request body:
+请求体：
 
 ```json
 {
@@ -43,38 +43,7 @@ Request body:
 }
 ```
 
-Rules:
-
-- `messages` is required and must contain at least one message.
-- `role` must be `system`, `user`, `assistant`, or `tool`.
-- `model` is optional. When omitted, the server uses `AI_CHAT_MODEL`.
-- `stream` defaults to `false`.
-- The route creates or propagates `requestId` through the `X-Request-Id` response header.
-- The route calls `src/server/ai` provider adapters only.
-- `AI_API_KEY` is read server-side through AI config and is never exposed to the frontend.
-
-Non-streaming success:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "message": {
-      "role": "assistant",
-      "content": "..."
-    },
-    "model": "model-name",
-    "usage": {
-      "inputTokens": 10,
-      "outputTokens": 20,
-      "totalTokens": 30
-    }
-  },
-  "requestId": "..."
-}
-```
-
-Streaming success uses `text/event-stream` with these event names:
+流式响应使用 `text/event-stream`，事件名：
 
 - `content`
 - `usage`
@@ -85,64 +54,19 @@ Streaming success uses `text/event-stream` with these event names:
 
 `GET /api/chat/models`
 
-Returns model names configured on the server for the chat UI model selector.
-
-Success response:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "defaultModel": "qwen-plus",
-    "options": [
-      { "id": "qwen-plus", "label": "通用模型", "role": "chat" },
-      { "id": "qwen-turbo", "label": "快速模型", "role": "fast" },
-      { "id": "qwen-max", "label": "推理模型", "role": "reasoning" }
-    ]
-  },
-  "requestId": "..."
-}
-```
-
-This route only returns model identifiers and labels. It must never return provider secrets.
+返回服务端配置的模型名，供前端模型选择器使用。
 
 ## Tools API
 
 `GET /api/tools`
 
-Returns safe metadata for registered backend tools.
-
-Success response:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "tools": [
-      {
-        "name": "calculate_cost",
-        "description": "Calculate subtotal, discount, tax, and total for a simple pricing scenario.",
-        "permissionLevel": "compute",
-        "requiresConfirmation": false,
-        "inputExample": {
-          "quantity": 12,
-          "unitPrice": 39.9,
-          "discountRate": 0.1,
-          "taxRate": 0.06,
-          "currency": "CNY"
-        }
-      }
-    ]
-  },
-  "requestId": "..."
-}
-```
+返回已注册后端工具的安全元信息。
 
 `POST /api/tools`
 
-Executes one registered backend tool.
+执行一个已注册工具。
 
-Request body:
+请求体：
 
 ```json
 {
@@ -157,42 +81,19 @@ Request body:
 }
 ```
 
-Success response:
+规则：
 
-```json
-{
-  "ok": true,
-  "data": {
-    "toolName": "calculate_cost",
-    "status": "success",
-    "output": {
-      "quantity": 12,
-      "unitPrice": 39.9,
-      "subtotal": 478.8,
-      "discount": 47.88,
-      "tax": 25.86,
-      "total": 456.78,
-      "currency": "CNY"
-    }
-  },
-  "requestId": "..."
-}
-```
-
-Rules:
-
-- Tools must be registered under `src/server/tools`.
-- Tool input is validated with each tool's Zod schema.
-- Tool execution logs include request id, tool name, latency, status, and error code.
-- Tools must not execute arbitrary code, raw SQL, shell commands, or destructive actions.
+- 工具必须注册在 `src/server/tools`。
+- 每个工具用自己的 Zod schema 校验输入。
+- 工具不能执行任意代码、原始 SQL、shell 命令或破坏性操作。
 
 ## Tool-Calling Chat API
 
 `POST /api/tool-calling/chat`
 
-Lets the model choose from allowlisted backend tools, executes requested tools on the server, then asks the model to produce a final answer from tool results.
+让模型从 allowlist 中选择工具，服务端执行工具，再让模型基于工具结果生成最终回答。
 
-Request body:
+请求体：
 
 ```json
 {
@@ -201,76 +102,19 @@ Request body:
 }
 ```
 
-Success response:
+成功响应包含：
 
-```json
-{
-  "ok": true,
-  "data": {
-    "answer": "最终回答",
-    "model": "qwen-plus",
-    "usage": {
-      "inputTokens": 100,
-      "outputTokens": 60,
-      "totalTokens": 160
-    },
-    "toolCalls": [
-      {
-        "id": "call_abc",
-        "name": "calculate_cost",
-        "arguments": {
-          "quantity": 12,
-          "unitPrice": 39.9,
-          "discountRate": 0.1,
-          "taxRate": 0.06
-        },
-        "status": "success",
-        "output": {
-          "total": 456.78,
-          "currency": "CNY"
-        }
-      }
-    ],
-    "timeline": [
-      {
-        "id": "analyze",
-        "title": "分析用户问题",
-        "status": "success",
-        "description": "模型已读取用户问题并判断是否需要工具。"
-      },
-      {
-        "id": "tool-1",
-        "title": "执行工具",
-        "status": "success",
-        "toolName": "calculate_cost",
-        "input": {
-          "quantity": 12,
-          "unitPrice": 39.9
-        },
-        "output": {
-          "total": 456.78,
-          "currency": "CNY"
-        }
-      }
-    ]
-  },
-  "requestId": "..."
-}
-```
-
-Rules:
-
-- The model only receives tool definitions from `listAiToolDefinitions`.
-- The server executes only registered tools through `executeTool`.
-- Tool calls are capped per request to keep execution bounded.
-- Tool outputs are sent back to the model as tool messages; raw secrets are never included.
-- `timeline` uses the status values `pending`, `running`, `success`, `error`, `skipped`, and `requires_confirmation`.
+- `answer`：最终回答。
+- `model`：实际模型。
+- `usage`：token 用量。
+- `toolCalls`：工具调用记录。
+- `timeline`：前端展示流程用的步骤列表。
 
 ## Structured Output API
 
 `POST /api/structured-output`
 
-Request body:
+请求体：
 
 ```json
 {
@@ -280,7 +124,7 @@ Request body:
 }
 ```
 
-Allowed `useCase` values:
+允许的 `useCase`：
 
 - `marketing`
 - `entities`
@@ -288,23 +132,58 @@ Allowed `useCase` values:
 - `task-plan`
 - `ui-schema`
 
-Success response:
+## RAG Ingest API
+
+`POST /api/rag/ingest`
+
+摄入文档、切片、生成 chunk embeddings，并写入内存向量库。
+
+请求体：
 
 ```json
 {
-  "ok": true,
-  "data": {
-    "output": {},
-    "rawText": "{}",
-    "model": "model-name",
-    "usage": {
-      "inputTokens": 10,
-      "outputTokens": 20,
-      "totalTokens": 30
-    }
-  },
-  "requestId": "..."
+  "sourceName": "产品说明文档",
+  "text": "至少 20 个字符的知识库文本",
+  "metadata": {
+    "category": "demo"
+  }
 }
 ```
 
-The route validates both the request body and the model-generated JSON. Invalid model JSON returns `INVALID_MODEL_JSON`; schema mismatch returns `STRUCTURED_OUTPUT_VALIDATION_ERROR`.
+成功响应包含：
+
+- `document`：文档记录。
+- `chunks`：切片结果。
+- `embedding`：embedding 模型和 usage。
+- `requestId`：请求 ID。
+
+## RAG Query API
+
+`POST /api/rag/query`
+
+对问题做 embedding，通过向量相似度检索 topK chunks，并生成引用回答。
+
+请求体：
+
+```json
+{
+  "question": "这个产品适合哪些用户？",
+  "topK": 4,
+  "model": "optional-model-name"
+}
+```
+
+成功响应包含：
+
+- `answer`：基于知识库的回答。
+- `citations`：引用来源。
+- `retrievedChunks`：检索片段，供调试 UI 展示。
+- `embedding`：query embedding 的模型和 usage。
+- `model`：生成回答使用的模型。
+- `usage`：embedding + answer generation 的合并 token 用量。
+
+规则：
+
+- 回答生成只发生在服务端。
+- 检索片段会返回给前端用于调试。
+- 如果没有相关片段，应返回“知识库中没有找到答案”，不能编造。

@@ -1,40 +1,43 @@
-# Tool Calling
+# 工具调用
 
-The first tool-calling milestone implements an internal tool execution layer and a minimal model-driven function-calling loop.
+工具调用模块包含两层：
 
-## Current Scope
+- 内部工具执行层。
+- 模型自动选择工具的最小 function calling loop。
 
-- Tools live under `src/server/tools`.
-- `GET /api/tools` returns safe tool metadata and example input.
-- `POST /api/tools` validates input and executes one selected tool.
-- `POST /api/tool-calling/chat` lets the model choose allowlisted tools, then generates a final answer from tool results.
-- `/tool-calling` supports manual execution and AI automatic tool calling.
-- The UI renders a timeline for analysis, tool selection, tool execution, skipped steps, confirmation placeholders, and final answer generation.
+## 当前范围
 
-## Registered Tools
+- 工具定义在 `src/server/tools`。
+- `GET /api/tools` 返回安全的工具元信息和示例输入。
+- `POST /api/tools` 校验输入并执行指定工具。
+- `POST /api/tool-calling/chat` 允许模型从 allowlist 中选择工具，再基于工具结果生成最终回答。
+- `/tool-calling` 支持手动执行和 AI 自动调用。
+- UI 展示 timeline：分析问题、选择工具、执行工具、跳过步骤、确认占位、生成最终回答。
 
-- `calculate_cost`: computes subtotal, discount, tax, and total.
-- `generate_campaign_brief`: creates a deterministic campaign brief from product, audience, goal, and channels.
+## 已注册工具
 
-## Safety Rules
+- `calculate_cost`：计算小计、折扣、税费和总价。
+- `generate_campaign_brief`：根据产品、受众、目标和渠道生成营销 brief。
 
-- Tool inputs are validated with Zod.
-- Tool output is validated when an output schema exists.
-- Tool execution logs request id, tool name, latency, status, and error code.
-- Current tools are compute-only and do not require confirmation.
-- Do not add tools that execute arbitrary code, shell commands, raw SQL, or destructive actions.
+## 安全规则
 
-## Model-Driven Flow
+- 工具输入必须用 Zod 校验。
+- 有输出 schema 时也要校验工具输出。
+- 工具执行日志要包含 requestId、toolName、latency、status、errorCode。
+- 当前工具都是 compute-only，不需要用户确认。
+- 不允许添加任意代码执行、shell 命令、原始 SQL 或破坏性操作。
 
-1. Send tool definitions from `listAiToolDefinitions` to the model.
-2. Detect model-requested `tool_calls`.
-3. Validate and execute allowlisted tools through `executeTool`.
-4. Feed tool results back to the model as `tool` messages.
-5. Return final answer, tool call records, timeline, request id, and usage.
+## 模型自动调用流程
+
+1. 通过 `listAiToolDefinitions` 把工具定义发给模型。
+2. 解析模型返回的 `tool_calls`。
+3. 只通过 `executeTool` 执行 allowlist 工具。
+4. 把工具结果作为 `tool` message 回填给模型。
+5. 返回最终回答、工具调用记录、timeline、requestId 和 usage。
 
 ## UI Timeline
 
-Timeline step status values:
+timeline step 支持这些状态：
 
 - `pending`
 - `running`
@@ -43,8 +46,13 @@ Timeline step status values:
 - `skipped`
 - `requires_confirmation`
 
-Each tool step can show the tool name, input arguments, output, and normalized error.
+每个工具步骤可以展示：
 
-## Next Step
+- 工具名
+- 输入参数
+- 输出结果
+- 归一化错误
 
-Add streaming for model-selected tool calling so timeline steps can update as soon as the model selects a tool and as soon as the server finishes executing it.
+## 下一步
+
+给模型自动工具调用增加 streaming，让模型选择工具、工具执行完成、最终回答生成这些步骤可以实时更新。

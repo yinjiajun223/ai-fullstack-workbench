@@ -32,9 +32,9 @@ const modules = [
   },
   {
     title: "RAG 知识库",
-    description: "文档上传、切分、检索、引用回答和调试面板。",
-    href: "#",
-    status: copy.planned,
+    description: "文本摄入、chunking、检索、引用回答和调试面板。",
+    href: "/rag",
+    status: copy.enabled,
   },
   {
     title: "Agent 工作流",

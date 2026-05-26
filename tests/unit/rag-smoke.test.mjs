@@ -1,0 +1,42 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+test("rag module has ingestion, retrieval, generation, route, and page wiring", async () => {
+  const chunking = await readFile("src/server/rag/chunking/simple.ts", "utf8");
+  const embedding = await readFile("src/server/rag/embedding/provider.ts", "utf8");
+  const store = await readFile("src/server/rag/store/memory.ts", "utf8");
+  const retrieval = await readFile("src/server/rag/retrieval/simple.ts", "utf8");
+  const vectorStore = await readFile("src/server/rag/vector-store/memory.ts", "utf8");
+  const generation = await readFile("src/server/rag/generation/answer.ts", "utf8");
+  const aiProvider = await readFile("src/server/ai/providers/openai-compatible.ts", "utf8");
+  const aiTypes = await readFile("src/server/ai/types.ts", "utf8");
+  const ingestRoute = await readFile("src/app/api/rag/ingest/route.ts", "utf8");
+  const queryRoute = await readFile("src/app/api/rag/query/route.ts", "utf8");
+  const page = await readFile("src/app/rag/page.tsx", "utf8");
+  const shell = await readFile("src/components/rag/RagShell.tsx", "utf8");
+  const home = await readFile("src/app/page.tsx", "utf8");
+
+  assert.match(chunking, /chunkDocument/);
+  assert.match(embedding, /embedTexts/);
+  assert.match(embedding, /provider\.embed/);
+  assert.match(store, /saveDocument/);
+  assert.match(store, /listChunks/);
+  assert.match(retrieval, /retrieveChunks/);
+  assert.match(vectorStore, /searchMemoryVectorStore/);
+  assert.match(vectorStore, /cosineSimilarity/);
+  assert.match(generation, /generateRagAnswer/);
+  assert.match(generation, /createAiProvider/);
+  assert.match(aiProvider, /\/embeddings/);
+  assert.match(aiTypes, /EmbeddingRequest/);
+  assert.match(ingestRoute, /RagIngestRequestSchema/);
+  assert.match(ingestRoute, /upsertEmbeddedChunks/);
+  assert.match(queryRoute, /RagQueryRequestSchema/);
+  assert.match(queryRoute, /searchMemoryVectorStore/);
+  assert.match(queryRoute, /retrievedChunks/);
+  assert.match(page, /RagShell/);
+  assert.match(shell, /fetch\("\/api\/rag\/ingest"/);
+  assert.match(shell, /fetch\("\/api\/rag\/query"/);
+  assert.match(home, /\/rag/);
+  assert.doesNotMatch(shell, /AI_API_KEY/);
+});

@@ -7,6 +7,8 @@ export type {
   ChatMessage,
   ChatRole,
   ChatStreamChunk,
+  EmbeddingRequest,
+  EmbeddingResult,
   ModelUsage,
   NormalizedAiProviderError,
 } from "./types";

@@ -4,6 +4,8 @@ import type {
   ChatCompletionResult,
   ChatMessage,
   ChatStreamChunk,
+  EmbeddingRequest,
+  EmbeddingResult,
   ModelUsage,
 } from "../types";
 import type { AiConfig } from "../config";
@@ -29,6 +31,15 @@ type OpenAiChatCompletionResponse = {
       content?: string | null;
       tool_calls?: OpenAiToolCall[];
     };
+  }>;
+  usage?: OpenAiUsage;
+};
+
+type OpenAiEmbeddingResponse = {
+  model?: string;
+  data?: Array<{
+    index?: number;
+    embedding?: number[];
   }>;
   usage?: OpenAiUsage;
 };
@@ -87,6 +98,17 @@ export function createOpenAiCompatibleProvider(
         };
       }
     },
+
+    async embed(request) {
+      const response = await fetchEmbedding({
+        config: options.config,
+        fetchImpl,
+        request,
+      });
+      const payload = (await response.json()) as OpenAiEmbeddingResponse;
+
+      return mapEmbeddingResult(payload);
+    },
   };
 }
 
@@ -120,6 +142,51 @@ async function fetchChatCompletion(input: {
 
 function buildChatCompletionUrl(baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+}
+
+async function fetchEmbedding(input: {
+  config: AiConfig;
+  fetchImpl: FetchLike;
+  request: EmbeddingRequest;
+}): Promise<Response> {
+  const model = input.request.model ?? input.config.embeddingModel;
+
+  if (!model) {
+    throw new AiProviderError({
+      code: "AI_EMBEDDING_MODEL_MISSING",
+      message: "Missing AI_EMBEDDING_MODEL for embedding request.",
+      statusCode: 500,
+      provider: "openai-compatible",
+    });
+  }
+
+  const response = await input.fetchImpl(buildEmbeddingUrl(input.config.baseUrl), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      input: input.request.input,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new AiProviderError({
+      code: "AI_EMBEDDING_HTTP_ERROR",
+      message: `AI embedding request failed with status ${response.status}.`,
+      statusCode: response.status,
+      provider: "openai-compatible",
+      retryable: response.status === 429 || response.status >= 500,
+    });
+  }
+
+  return response;
+}
+
+function buildEmbeddingUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/embeddings`;
 }
 
 function toOpenAiChatCompletionBody(
@@ -187,6 +254,19 @@ function mapUsage(usage: OpenAiUsage | undefined): ModelUsage | undefined {
     inputTokens: usage.prompt_tokens ?? 0,
     outputTokens: usage.completion_tokens ?? 0,
     totalTokens: usage.total_tokens ?? 0,
+  };
+}
+
+function mapEmbeddingResult(payload: OpenAiEmbeddingResponse): EmbeddingResult {
+  const embeddings = [...(payload.data ?? [])]
+    .sort((left, right) => (left.index ?? 0) - (right.index ?? 0))
+    .map((item) => item.embedding ?? []);
+
+  return {
+    embeddings,
+    model: payload.model,
+    usage: mapUsage(payload.usage),
+    raw: payload,
   };
 }
 

@@ -49,6 +49,18 @@ export type ChatCompletionResult = {
   raw?: unknown;
 };
 
+export type EmbeddingRequest = {
+  input: string[];
+  model?: string;
+};
+
+export type EmbeddingResult = {
+  embeddings: number[][];
+  model?: string;
+  usage?: ModelUsage;
+  raw?: unknown;
+};
+
 export type ChatStreamChunk =
   | {
       type: "content";
@@ -79,4 +91,5 @@ export type AiProvider = {
   name: string;
   chat: (request: ChatCompletionRequest) => Promise<ChatCompletionResult>;
   streamChat: (request: ChatCompletionRequest) => AsyncIterable<ChatStreamChunk>;
+  embed: (request: EmbeddingRequest) => Promise<EmbeddingResult>;
 };
