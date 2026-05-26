@@ -1,0 +1,41 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+test("tool calling module has registry, route, and page wiring", async () => {
+  const registry = await readFile("src/server/tools/registry.ts", "utf8");
+  const route = await readFile("src/app/api/tools/route.ts", "utf8");
+  const chatRoute = await readFile("src/app/api/tool-calling/chat/route.ts", "utf8");
+  const provider = await readFile("src/server/ai/providers/openai-compatible.ts", "utf8");
+  const aiTypes = await readFile("src/server/ai/types.ts", "utf8");
+  const page = await readFile("src/app/tool-calling/page.tsx", "utf8");
+  const shell = await readFile("src/components/tools/ToolCallingShell.tsx", "utf8");
+  const home = await readFile("src/app/page.tsx", "utf8");
+
+  assert.match(registry, /calculateCostTool/);
+  assert.match(registry, /generateCampaignBriefTool/);
+  assert.match(registry, /ToolValidationError/);
+  assert.match(registry, /listAiToolDefinitions/);
+  assert.match(route, /ToolExecutionRequestSchema/);
+  assert.match(route, /executeTool/);
+  assert.match(route, /logger\.info/);
+  assert.match(chatRoute, /toolChoice: "auto"/);
+  assert.match(chatRoute, /executeRequestedToolCalls/);
+  assert.match(chatRoute, /buildTimeline/);
+  assert.match(chatRoute, /skipped/);
+  assert.match(chatRoute, /role: "tool"/);
+  assert.match(provider, /tool_calls/);
+  assert.match(provider, /tool_choice/);
+  assert.match(aiTypes, /AiToolDefinition/);
+  assert.match(aiTypes, /AiToolCall/);
+  assert.match(page, /ToolCallingShell/);
+  assert.match(shell, /fetch\("\/api\/tools"/);
+  assert.match(shell, /fetch\("\/api\/tool-calling\/chat"/);
+  assert.match(shell, /TimelinePanel/);
+  assert.match(shell, /ToolTimelineStep/);
+  assert.match(shell, /buildManualResultTimeline/);
+  assert.match(shell, /requiresConfirmation/);
+  assert.match(shell, /requires_confirmation/);
+  assert.match(home, /\/tool-calling/);
+  assert.doesNotMatch(shell, /AI_API_KEY/);
+});
